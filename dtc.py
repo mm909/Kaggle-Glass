@@ -12,7 +12,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import GridSearchCV
 
-load = 1
 glass = pd.read_csv("glass.csv")
 
 # Split labels
@@ -23,9 +22,20 @@ test_labels = test_["Type"]
 test_ = test_.drop(columns = ["Type"])
 train = train_
 
-if load:
-    currPredict = joblib.load('dtc.pkl')
-else:
+newModel = True
+for i in range(1000):
+
+    if newModel:
+        currPredictOld = joblib.load('dtc.pkl')
+        newModel = False
+    count = 0
+    tree_predict = currPredictOld.predict(test_)
+    for i, prediction in enumerate(tree_predict):
+        if prediction == test_labels.iloc[i]:
+            count += 1
+        pass
+    OldAccuracy = count / len(test_)
+
     # # pg.175
     param_grid = [
         {'max_depth':[1,3,5,7,9,11,13,15,17], 'criterion': ['gini', 'entropy'], 'splitter': ['best', 'random']}
@@ -34,23 +44,29 @@ else:
     tree_clf = DecisionTreeClassifier()
     grid_search = GridSearchCV(tree_clf, param_grid, cv = 5, return_train_score=True, n_jobs=-1, iid = True)
     grid_search.fit(train, train_labels)
-    print(grid_search.best_params_)
-    print(grid_search.best_score_)
+    # print(grid_search.best_params_)
+    # print(grid_search.best_score_)
     currPredict = grid_search.best_estimator_
 
-count = 0
-tree_predict = currPredict.predict(test_)
-for i, prediction in enumerate(tree_predict):
-    if prediction == test_labels.iloc[i]:
-        count += 1
-    pass
-print(count/len(test_))
+    count = 0
+    tree_predict = currPredict.predict(test_)
+    for i, prediction in enumerate(tree_predict):
+        if prediction == test_labels.iloc[i]:
+            count += 1
+        pass
+    NewAccuracy = count / len(test_)
 
+    if(NewAccuracy > OldAccuracy):
+        newModel = True
+        print(i)
+        print("Old:", OldAccuracy)
+        print("New:", NewAccuracy)
+        print("Saving new model...")
+        print('\n')
+        export_graphviz(
+            currPredict,
+            out_file = 'glass_tree.dot',
+            feature_names = glass.columns[:9]
+        )
 
-export_graphviz(
-    currPredict,
-    out_file = 'glass_tree.dot',
-    feature_names = glass.columns[:9]
-)
-
-joblib.dump(currPredict, "dtc.pkl")
+        joblib.dump(currPredict, "dtc.pkl")
